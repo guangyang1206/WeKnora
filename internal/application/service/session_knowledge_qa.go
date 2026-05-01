@@ -739,12 +739,24 @@ func (s *sessionService) handleModelFallback(ctx context.Context, chatManage *ty
 		Thinking:            &thinking,
 	}
 
-	// Start streaming response
+	// Build messages: system prompt + conversation history + current user message.
+	// History is included so the fallback LLM has multi-turn context, consistent
+	// with the normal knowledge-base completion path (prepareMessagesWithHistory).
+	var chatMessages []chat.Message
+	if chatManage.SummaryConfig.Prompt != "" {
+		chatMessages = append(chatMessages, chat.Message{Role: "system", Content: chatManage.SummaryConfig.Prompt})
+	}
+	for _, history := range chatManage.History {
+		chatMessages = append(chatMessages, chat.Message{Role: "user", Content: history.Query})
+		chatMessages = append(chatMessages, chat.Message{Role: "assistant", Content: history.Answer})
+	}
 	userMsg := chat.Message{Role: "user", Content: promptContent}
 	if chatManage.ChatModelSupportsVision && len(chatManage.Images) > 0 {
 		userMsg.Images = chatManage.Images
 	}
-	responseChan, err := chatModel.ChatStream(ctx, []chat.Message{userMsg}, opt)
+	chatMessages = append(chatMessages, userMsg)
+
+	responseChan, err := chatModel.ChatStream(ctx, chatMessages, opt)
 	if err != nil {
 		logger.Errorf(ctx, "Failed to start streaming fallback response: %v, falling back to fixed response", err)
 		s.handleFixedFallback(ctx, chatManage)
