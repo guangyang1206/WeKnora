@@ -184,6 +184,7 @@ export default {
     missingId: 'Knowledge base ID is missing',
     deleteFailed: 'Delete failed. Please try again later!',
     quickActions: 'Quick Actions',
+    displayName: 'Display Name (optional)',
     createKnowledgeBase: 'Create Knowledge Base',
     knowledgeBaseName: 'Knowledge Base Name',
     enterName: 'Enter knowledge base name',

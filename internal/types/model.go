@@ -87,6 +87,9 @@ type Model struct {
 	TenantID uint64 `yaml:"tenant_id"   json:"tenant_id"`
 	// Name of the model
 	Name string `yaml:"name"        json:"name"`
+	// DisplayName is an optional user-friendly alias shown in the UI.
+	// When empty, the UI should fall back to Name.
+	DisplayName string `yaml:"display_name" json:"display_name,omitempty"`
 	// Type of the model
 	Type ModelType `yaml:"type"        json:"type"`
 	// Source of the model

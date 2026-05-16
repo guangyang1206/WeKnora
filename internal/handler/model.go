@@ -64,10 +64,21 @@ func hideSensitiveInfo(model *types.Model) *types.Model {
 // Contains all fields required to create a new model in the system
 type CreateModelRequest struct {
 	Name        string                `json:"name"        binding:"required"`
+	DisplayName string                `json:"display_name"`
 	Type        types.ModelType       `json:"type"        binding:"required"`
 	Source      types.ModelSource     `json:"source"      binding:"required"`
 	Description string                `json:"description"`
 	Parameters  types.ModelParameters `json:"parameters"  binding:"required"`
+}
+
+// UpdateModelRequest defines the structure for model update requests
+type UpdateModelRequest struct {
+	Name        *string                `json:"name"`
+	DisplayName *string                `json:"display_name"`
+	Type        *types.ModelType       `json:"type"`
+	Source      *types.ModelSource     `json:"source"`
+	Description *string                `json:"description"`
+	Parameters  *types.ModelParameters `json:"parameters"`
 }
 
 // CreateModel godoc
@@ -115,6 +126,7 @@ func (h *ModelHandler) CreateModel(c *gin.Context) {
 	model := &types.Model{
 		TenantID:    tenantID,
 		Name:        secutils.SanitizeForLog(req.Name),
+		DisplayName: secutils.SanitizeForLog(req.DisplayName),
 		Type:        types.ModelType(secutils.SanitizeForLog(string(req.Type))),
 		Source:      req.Source,
 		Description: secutils.SanitizeForLog(req.Description),
@@ -297,8 +309,11 @@ func (h *ModelHandler) UpdateModel(c *gin.Context) {
 	}
 
 	// Update model fields if they are provided in the request
-	if req.Name != "" {
-		model.Name = req.Name
+	if req.Name != nil && *req.Name != "" {
+		model.Name = *req.Name
+	}
+	if req.DisplayName != nil {
+		model.DisplayName = *req.DisplayName
 	}
 	model.Description = req.Description
 
