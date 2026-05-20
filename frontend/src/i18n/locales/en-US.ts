@@ -2676,6 +2676,8 @@ export default {
       remoteDimensionDetected: 'Detected vector dimension: {value}',
       supportsVisionLabel: 'Supports Vision / Multimodal',
       supportsVisionDesc: 'Whether the model accepts image and multimodal input',
+      isBuiltinLabel: 'Global / Built-in Model',
+      isBuiltinDesc: 'Mark this model as a global (built-in) model accessible across all tenants',
       dimensionHint: 'Model selected. Click "Detect Dimension" to fetch the vector dimension automatically.',
       loadModelListFailed: 'Failed to load model list',
       listRefreshed: 'List refreshed',

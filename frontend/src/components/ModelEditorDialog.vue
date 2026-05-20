@@ -234,6 +234,15 @@
         </div>
       </div>
 
+      <!-- Global/Built-in model toggle -->
+      <div class="form-item">
+        <label class="form-label">{{ $t('model.editor.isBuiltinLabel') }}</label>
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <t-switch v-model="formData.isBuiltin" />
+          <span class="form-desc">{{ $t('model.editor.isBuiltinDesc') }}</span>
+        </div>
+      </div>
+
     </t-form>
   </SettingDrawer>
 </template>
@@ -273,6 +282,7 @@ interface ModelFormData {
   dimension?: number
   interfaceType?: 'ollama' | 'openai'
   isDefault: boolean
+  isBuiltin: boolean
   supportsVision?: boolean
   // 自定义 HTTP 请求头（类似 OpenAI Python SDK 的 extra_headers）
   customHeaders?: CustomHeaderItem[]
@@ -745,6 +755,7 @@ const resetForm = () => {
     dimension: undefined, // 默认不填，让用户手动输入或通过检测按钮获取
     interfaceType: undefined,
     isDefault: false,
+    isBuiltin: false,
     supportsVision: false,
     customHeaders: []
   }
