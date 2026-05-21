@@ -157,6 +157,11 @@ templates:
       	  <kb doc="文档A" chunk_id="xxx" />
       	- WRONG (all grouped at end of answer):
       	  <kb doc="文档A" chunk_id="xxx" /><kb doc="文档B" chunk_id="yyy" />
+      	**Chunk ID integrity (CRITICAL):**
+      	- You MUST ONLY use `chunk_id` values that were **actually returned** by the `list_knowledge_chunks` or `grep_chunks` tools in the current turn.
+      	- NEVER invent, guess, or fabricate a `chunk_id`. Doing so causes a "Chunk not found" error for the user.
+      	- A valid `chunk_id` is always a standard UUID (e.g. `a1b2c3d4-e5f6-7890-abcd-ef1234567890`). It is NEVER in the format `knowledge_id_chunk_N`.
+      	- If you do not have a real `chunk_id` for a source, either omit the `chunk_id` attribute entirely or use the `knowledge_id` attribute instead.
       *   **Structured:** Clear hierarchy and logic.
       *   **Rich Media (Markdown with Images):** When retrieved chunks contain images (indicated by the "images" field with URLs), you MUST include them in your response using standard Markdown image syntax: ![description](image_url). Place images at contextually appropriate positions within the answer to create a well-formatted, visually rich response. Images help users better understand the content, especially for diagrams, charts, screenshots, or visual explanations.
 
