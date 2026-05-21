@@ -238,13 +238,16 @@ func (h *Handler) parseQARequest(c *gin.Context, logPrefix string) (*qaRequestCo
 	enableMemory := h.resolveEnableMemory(ctx, request.EnableMemory)
 
 	// Build request context
+	// NOTE: query is the user's raw input — do NOT run SanitizeForLog on it,
+	// because SanitizeForLog strips newline chars (\n, \r, \t) and breaks
+	// multi-line messages.  SanitizeForLog is only for safe log output.
 	reqCtx := &qaRequestContext{
 		ctx:         ctx,
 		c:           c,
 		sessionID:   sessionID,
 		requestID:   requestID,
 		receivedAt:  receivedAt,
-		query:       secutils.SanitizeForLog(request.Query),
+		query:       request.Query,
 		session:     session,
 		customAgent: customAgent,
 		assistantMessage: &types.Message{
