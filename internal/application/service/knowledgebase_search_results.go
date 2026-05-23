@@ -331,12 +331,23 @@ func (s *knowledgeBaseService) buildSearchResult(chunk *types.Chunk,
 	}
 }
 
-// isSearchableChunk checks if a chunk type should be included in search results.
+// isSearchableChunk checks if a chunk should be included in search results.
+// Returns false if the chunk type is not searchable or if the chunk is disabled.
 func (s *knowledgeBaseService) isSearchableChunk(chunk *types.Chunk) bool {
-	return slices.Contains([]types.ChunkType{
+	// First check if the chunk type is searchable
+	if !slices.Contains([]types.ChunkType{
 		types.ChunkTypeText, types.ChunkTypeSummary,
 		types.ChunkTypeTableColumn, types.ChunkTypeTableSummary,
 		types.ChunkTypeFAQ,
 		types.ChunkTypeImageOCR, types.ChunkTypeImageCaption,
-	}, chunk.ChunkType)
+	}, chunk.ChunkType) {
+		return false
+	}
+
+	// Then check if the chunk is enabled (skip disabled FAQ entries)
+	if !chunk.IsEnabled {
+		return false
+	}
+
+	return true
 }
