@@ -229,6 +229,17 @@ func (c *RemoteAPIChat) ConvertMessages(messages []Message) []openai.ChatComplet
 			openaiMsg.Content = msg.Content
 		}
 
+		// Local LLM compatibility fix:
+		// Some local inference engines (vLLM, Xinference with Qwen3-VL/Qwen3.5)
+		// crash when processing assistant messages with tool_calls and content: null.
+		// Ensure content is explicitly set to empty string in such cases.
+		if msg.Role == "assistant" && len(msg.ToolCalls) > 0 && openaiMsg.Content == "" {
+			// go-openai library may serialize nil/empty Content as JSON null.
+			// Local LLM templates (Jinja2) often can't handle null content.
+			// Set a non-nil empty string to guarantee "content": "" in JSON.
+			openaiMsg.Content = ""
+		}
+
 		if len(msg.ToolCalls) > 0 {
 			openaiMsg.ToolCalls = make([]openai.ToolCall, 0, len(msg.ToolCalls))
 			for _, tc := range msg.ToolCalls {
