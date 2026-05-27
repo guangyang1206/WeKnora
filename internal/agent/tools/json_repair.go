@@ -16,14 +16,61 @@ import (
 //
 // Returns the repaired JSON string. If repair is not possible,
 // returns the original string unchanged (caller should handle parse errors).
+func extractFirstJSONObject(s string) string {
+	depth := 0
+	inString := false
+	escaped := false
+	start := -1
+
+	for i, r := range s {
+		if escaped {
+			escaped = false
+			continue
+		}
+		if r == '\\' && inString {
+			escaped = true
+			continue
+		}
+		if r == '"' {
+			inString = !inString
+			continue
+		}
+		if inString {
+			continue
+		}
+		if r == '{' {
+			if depth == 0 {
+				start = i
+			}
+			depth++
+		}
+		if r == '}' {
+			depth--
+			if depth == 0 && start != -1 {
+				return s[start : i+1]
+			}
+		}
+	}
+	return ""
+}
+
 func RepairJSON(s string) string {
 	s = strings.TrimSpace(s)
 	if s == "" {
 		return "{}"
 	}
 
+	// Handle multiple top-level JSON objects (LLM sometimes concatenates them).
+	// Extract only the first complete object to avoid "invalid character '{' after
+	// top-level value" errors. See WeKnora #1455.
+	if len(s) > 0 && s[0] == '{' {
+		if firstObj := extractFirstJSONObject(s); firstObj != "" && len(firstObj) < len(s) {
+			s = firstObj
+		}
+	}
+
 	// Must start with { for object
-	if s[0] != '{' {
+	if len(s) > 0 && s[0] != '{' {
 		// Maybe the LLM returned just key=value pairs without braces
 		if strings.Contains(s, ":") || strings.Contains(s, "=") {
 			s = "{" + s + "}"
