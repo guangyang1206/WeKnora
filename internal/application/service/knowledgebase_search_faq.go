@@ -158,8 +158,14 @@ func (s *knowledgeBaseService) iterativeRetrieveWithDeduplication(ctx context.Co
 				continue
 			}
 
-			// Check negative questions using cached data
+			// Check negative questions AND is_enabled using cached data
 			if chunkData, ok := chunkDataCache[result.ChunkID]; ok {
+				// Fix: skip disabled FAQ entries — they should not appear in search results.
+				if !chunkData.IsEnabled {
+					filteredOutChunks[result.ChunkID] = struct{}{}
+					delete(uniqueChunks, result.ChunkID)
+					continue
+				}
 				if chunkData.ChunkType == types.ChunkTypeFAQ {
 					if meta, err := chunkData.FAQMetadata(); err == nil && meta != nil {
 						if s.matchesNegativeQuestions(queryTextLower, meta.NegativeQuestions) {
@@ -250,7 +256,7 @@ func (s *knowledgeBaseService) filterByNegativeQuestions(ctx context.Context,
 		chunkMap[chunk.ID] = chunk
 	}
 
-	// Filter out chunks that match negative questions
+	// Filter out chunks that match negative questions, OR are disabled FAQ entries.
 	filteredChunks := make([]*types.IndexWithScore, 0, len(chunks))
 	for _, chunk := range chunks {
 		chunkData, ok := chunkMap[chunk.ChunkID]
@@ -260,7 +266,13 @@ func (s *knowledgeBaseService) filterByNegativeQuestions(ctx context.Context,
 			continue
 		}
 
-		// Only filter FAQ type chunks
+		// Fix: skip disabled FAQ entries — they must not appear in search results.
+		if !chunkData.IsEnabled {
+			logger.Debugf(ctx, "Filtering disabled FAQ chunk %s", chunk.ChunkID)
+			continue
+		}
+
+		// Only filter FAQ type chunks for negative questions
 		if chunkData.ChunkType != types.ChunkTypeFAQ {
 			filteredChunks = append(filteredChunks, chunk)
 			continue

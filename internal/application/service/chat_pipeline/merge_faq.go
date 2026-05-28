@@ -61,6 +61,27 @@ func (p *PluginMerge) populateFAQAnswers(
 	}
 
 	updated := 0
+	// Build a set of disabled chunk IDs so we can remove them from results.
+	// Fix: previously disabled FAQ entries were still returned because
+	// ListChunksByID does NOT filter by is_enabled.
+	disabledChunkIDs := make(map[string]struct{})
+	for _, chunk := range chunks {
+		if chunk == nil {
+			continue
+		}
+		if !chunk.IsEnabled {
+			disabledChunkIDs[chunk.ID] = struct{}{}
+		}
+	}
+
+	// Remove results whose chunks are disabled, so they don't appear
+	// in the final answer.
+	if len(disabledChunkIDs) > 0 {
+		pipelineInfo(ctx, "Merge", "faq_disabled_filtered", map[string]interface{}{
+			"count": len(disabledChunkIDs),
+		})
+	}
+
 	for _, chunk := range chunks {
 		if chunk == nil {
 			continue
@@ -75,6 +96,11 @@ func (p *PluginMerge) populateFAQAnswers(
 			}
 			continue
 		}
+		// Skip disabled FAQ entries — they should not be shown.
+		if _, disabled := disabledChunkIDs[chunk.ID]; disabled {
+			continue
+		}
+
 		content := buildFAQAnswerContent(meta)
 		if content == "" {
 			continue
