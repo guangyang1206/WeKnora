@@ -61,6 +61,8 @@ const (
 	ProviderNovita ProviderName = "novita"
 	// Azure OpenAI
 	ProviderAzureOpenAI ProviderName = "azure_openai"
+	// Local LLM (vLLM, Xinference, Ollama, etc.)
+	ProviderLocalLLM ProviderName = "local_llm"
 )
 
 // AllProviders 返回所有注册的提供者名称
@@ -90,6 +92,7 @@ func AllProviders() []ProviderName {
 		ProviderGPUStack,
 		ProviderNvidia,
 		ProviderNovita,
+		ProviderLocalLLM,
 		ProviderAzureOpenAI,
 	}
 }
@@ -216,8 +219,20 @@ func ListByModelType(modelType types.ModelType) []ProviderInfo {
 }
 
 // DetectProvider 通过 BaseURL 检测服务商
+// isLocalLLMBaseURL 检测是否为本地 LLM 部署的 BaseURL
+// 支持 vLLM、Xinference、Ollama、OneAPI 等本地/私有化部署
+func isLocalLLMBaseURL(baseURL string) bool {
+	return containsAny(baseURL,
+		"localhost", "127.0.0.1", "vllm", "xinference",
+		"ollama", "oneapi", "0.0.0.0",
+	)
+}
+
+// DetectProvider 通过 BaseURL 检测服务商
 func DetectProvider(baseURL string) ProviderName {
 	switch {
+	case isLocalLLMBaseURL(baseURL):
+		return ProviderLocalLLM
 	case containsAny(baseURL, "dashscope.aliyuncs.com"):
 		return ProviderAliyun
 	case containsAny(baseURL, "open.bigmodel.cn", "zhipu"):

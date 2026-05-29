@@ -250,3 +250,131 @@ func volcengineRequestCustomizer(
 
 	return vcReq, true
 }
+
+// --- Local LLM RequestCustomizer ---
+
+// localLLMRequestCustomizer 自定义本地 LLM 请求（vLLM、Xinference、Ollama 等）
+// 修复两个与本地推理引擎 Jinja2 模板的兼容性问题：
+//   1. `content: null` 或 missing content 导致 Jinja2 TypeError
+//      → 确保 content 字段始终存在（nil → JSON null，空字符串 → ""）
+//   2. `tool_calls[].function.arguments` 在 OpenAI wire format 中是 JSON 字符串，
+//      但 vLLM/Xinference 的 Jinja2 模板用 `.items()` 遍历，期望是 dict
+//      → 将 arguments 从 JSON 字符串解析后作为 JSON 对象重新序列化
+func localLLMRequestCustomizer(
+	req *openai.ChatCompletionRequest, _ *ChatOptions, isStream bool,
+) (any, bool) {
+	type customToolCallFunction struct {
+		Name      string          `json:"name,omitempty"`
+		Arguments json.RawMessage `json:"arguments"` // serialized as JSON object, not string
+	}
+	type customToolCall struct {
+		ID       string                   `json:"id,omitempty"`
+		Type     string                   `json:"type"`
+		Function customToolCallFunction `json:"function"`
+	}
+	type customMessage struct {
+		Role             string            `json:"role"`
+		Content          *string           `json:"content"` // pointer: nil → null, non-nil → string
+		Name             string            `json:"name,omitempty"`
+		ToolCalls        []customToolCall `json:"tool_calls,omitempty"`
+		ToolCallID       string            `json:"tool_call_id,omitempty"`
+		ReasoningContent string            `json:"reasoning_content,omitempty"`
+	}
+	type customRequest struct {
+		Model             string            `json:"model"`
+		Messages          []customMessage   `json:"messages"`
+		Stream            bool              `json:"stream,omitempty"`
+		Temperature        *float32         `json:"temperature,omitempty"`
+		TopP              *float32         `json:"top_p,omitempty"`
+		MaxTokens         int               `json:"max_tokens,omitempty"`
+		MaxCompletionTokens int               `json:"max_completion_tokens,omitempty"`
+		FrequencyPenalty   *float32         `json:"frequency_penalty,omitempty"`
+		PresencePenalty    *float32         `json:"presence_penalty,omitempty"`
+		Tools             []openai.Tool    `json:"tools,omitempty"`
+		ToolChoice        any               `json:"tool_choice,omitempty"`
+		ParallelToolCalls  any               `json:"parallel_tool_calls,omitempty"`
+	}
+
+	// Convert messages
+	customMsgs := make([]customMessage, 0, len(req.Messages))
+	for _, m := range req.Messages {
+		cmsg := customMessage{
+			Role:             m.Role,
+			Name:             m.Name,
+			ToolCallID:       m.ToolCallID,
+			ReasoningContent: m.ReasoningContent,
+		}
+
+		// Fix content: pointer semantics
+		// - assistant with tool_calls + no content → nil (JSON null)
+		// - otherwise → point to content string (may be "")
+		if m.Content != "" {
+			cmsg.Content = &m.Content
+		} else if len(m.ToolCalls) > 0 {
+			cmsg.Content = nil // JSON null
+		} else {
+			empty := ""
+			cmsg.Content = &empty
+		}
+
+		// Fix tool_calls: arguments JSON string → JSON object
+		if len(m.ToolCalls) > 0 {
+			cmsg.ToolCalls = make([]customToolCall, 0, len(m.ToolCalls))
+			for _, tc := range m.ToolCalls {
+				var argsObj json.RawMessage
+				if tc.Function.Arguments != "" {
+					var parsed interface{}
+					if err := json.Unmarshal([]byte(tc.Function.Arguments), &parsed); err == nil {
+						argsObj, _ = json.Marshal(parsed)
+					} else {
+						// not valid JSON: keep as string wrapped in quotes
+						argsObj = json.RawMessage(`"` + tc.Function.Arguments + `"`)
+					}
+				} else {
+					argsObj = json.RawMessage("{}")
+				}
+				cmsg.ToolCalls = append(cmsg.ToolCalls, customToolCall{
+					ID:   tc.ID,
+					Type: string(tc.Type),
+					Function: customToolCallFunction{
+						Name:      tc.Function.Name,
+						Arguments: argsObj,
+					},
+				})
+			}
+		}
+
+		customMsgs = append(customMsgs, cmsg)
+	}
+
+	customReq := customRequest{
+		Model:    req.Model,
+		Messages: customMsgs,
+		Stream:   isStream,
+	}
+	if req.Temperature != 0 {
+		t := req.Temperature
+		customReq.Temperature = &t
+	}
+	if req.TopP != 0 {
+		t := req.TopP
+		customReq.TopP = &t
+	}
+	if req.MaxTokens != 0 {
+		customReq.MaxTokens = req.MaxTokens
+	}
+	if req.MaxCompletionTokens != 0 {
+		customReq.MaxCompletionTokens = req.MaxCompletionTokens
+	}
+	if len(req.Tools) > 0 {
+		customReq.Tools = req.Tools
+	}
+	if req.ToolChoice != nil {
+		customReq.ToolChoice = req.ToolChoice
+	}
+	if req.ParallelToolCalls != nil {
+		customReq.ParallelToolCalls = req.ParallelToolCalls
+	}
+
+	return customReq, true // useRawHTTP = true
+}
